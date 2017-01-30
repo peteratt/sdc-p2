@@ -18,21 +18,37 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# pylint: disable=missing-docstring
-import argparse
-import os.path
-import sys
 import time
 
 import pickle
+
+import datetime
 import tensorflow as tf
 import numpy as np
 
 import trafficsigns
 
-# Basic model parameters as external flags.
-FLAGS = None
 
+# Process images of this size. Note that this differs from the original traffic signs
+# image size of 32 x 32. If one alters this number, then the entire model
+# architecture will change and any model would need to be retrained.
+IMAGE_SIZE = 24
+
+# Global constants describing the traffic signs data set.
+NUM_CLASSES = 43
+NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 50000
+NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 10000
+
+# Basic model parameters as external flags.
+FLAGS = tf.app.flags.FLAGS
+
+# Directory where to write event logs and checkpoint.
+TRAINING_DIR = 'trafficsigns_train'
+
+# Number of batches to run.
+MAX_STEPS = 1000000
+
+log_device_placement = False
 
 class Datasets:
     def __init__(self, train, validation, test):
@@ -46,119 +62,50 @@ class Dataset:
         self.X = X
         self.y = y
         self.num_examples = len(X)
-        self.current_batch_index = 0
+        self.current_index = 0
 
-    def next_batch(self, batch_size):
-        next_index = self.current_batch_index + batch_size
+    def next_example(self):
+        res = self.X[self.current_index], np.array([self.y[self.current_index]])
+        self.current_index = (self.current_index + 1) % self.num_examples
 
-        if next_index > self.num_examples - 1:
-            overflow_index = next_index % self.num_examples
-            batch_X = np.append(self.X[self.current_batch_index:self.num_examples], self.X[0:overflow_index], axis=0)
-            batch_y = np.append(self.y[self.current_batch_index:self.num_examples], self.y[0:overflow_index])
-            self.current_batch_index = overflow_index
-        else:
-            batch_X, batch_y = self.X[self.current_batch_index:next_index], \
-                               self.y[self.current_batch_index:next_index]
-            self.current_batch_index += batch_size
-
-        return batch_X, batch_y
+        return res
 
 
+def _generate_image_and_label_batch(image, label, min_queue_examples, batch_size, shuffle):
+    """Construct a queued batch of images and labels.
 
-def placeholder_inputs():
-    """Generate placeholder variables to represent the input tensors.
+      Args:
+        image: 3-D Tensor of [height, width, 3] of type.float32.
+        label: 1-D Tensor of type.int32
+        min_queue_examples: int32, minimum number of samples to retain
+          in the queue that provides of batches of examples.
+        batch_size: Number of images per batch.
+        shuffle: boolean indicating whether to use a shuffling queue.
 
-    These placeholders are used as inputs by the rest of the model building
-    code and will be fed from the downloaded data in the .run() loop, below.
+      Returns:
+        images: Images. 4D tensor of [batch_size, height, width, 3] size.
+        labels: Labels. 1D tensor of [batch_size] size.
+      """
+    # Create a queue that shuffles the examples, and then
+    # read 'batch_size' images + labels from the example queue.
+    num_preprocess_threads = 16
+    if shuffle:
+        images, label_batch = tf.train.shuffle_batch(
+            [image, label],
+            batch_size=batch_size,
+            num_threads=num_preprocess_threads,
+            capacity=min_queue_examples + 3 * batch_size,
+            min_after_dequeue=min_queue_examples)
+    else:
+        images, label_batch = tf.train.batch(
+            [image, label],
+            batch_size=batch_size,
+            num_threads=num_preprocess_threads,
+            capacity=min_queue_examples + 3 * batch_size)
 
-    Args:
-      batch_size: The batch size will be baked into both placeholders.
-
-    Returns:
-      images_placeholder: Images placeholder.
-      labels_placeholder: Labels placeholder.
-    """
-    # Note that the shapes of the placeholders match the shapes of the full
-    # image and label tensors, except the first dimension is now batch_size
-    # rather than the full size of the train or test data sets.
-    images_placeholder = tf.placeholder(tf.float32, shape=(None,
-                                                           trafficsigns.IMAGE_FEATURES))
-    labels_placeholder = tf.placeholder(tf.int32, shape=(None))
-    return images_placeholder, labels_placeholder
-
-
-def fill_feed_dict(data_set, images_pl, labels_pl):
-    """Fills the feed_dict for training the given step.
-
-    A feed_dict takes the form of:
-    feed_dict = {
-        <placeholder>: <tensor of values to be passed for placeholder>,
-        ....
-    }
-
-    Args:
-      data_set: The set of images and labels, from input_data.read_data_sets()
-      images_pl: The images placeholder, from placeholder_inputs().
-      labels_pl: The labels placeholder, from placeholder_inputs().
-
-    Returns:
-      feed_dict: The feed dictionary mapping from placeholders to values.
-    """
-    # Create the feed_dict for the placeholders filled with the next
-    # `batch size` examples.
-    images_feed, labels_feed = data_set.next_batch(FLAGS.batch_size)
-    feed_dict = {
-        images_pl: images_feed,
-        labels_pl: labels_feed,
-    }
-    return feed_dict
-
-
-def do_eval(sess,
-            eval_correct,
-            images_placeholder,
-            labels_placeholder,
-            data_set):
-    """Runs one evaluation against the full epoch of data.
-
-    Args:
-      sess: The session in which the model has been trained.
-      eval_correct: The Tensor that returns the number of correct predictions.
-      images_placeholder: The images placeholder.
-      labels_placeholder: The labels placeholder.
-      data_set: The set of images and labels to evaluate, from
-        input_data.read_data_sets().
-    """
-    # And run one epoch of eval.
-    true_count = 0  # Counts the number of correct predictions.
-    steps_per_epoch = data_set.num_examples // FLAGS.batch_size
-    num_examples = steps_per_epoch * FLAGS.batch_size
-    for step in range(steps_per_epoch):
-        feed_dict = fill_feed_dict(data_set,
-                                   images_placeholder,
-                                   labels_placeholder)
-        true_count += sess.run(eval_correct, feed_dict=feed_dict)
-    precision = float(true_count) / num_examples
-    print('  Num examples: %d  Num correct: %d  Precision @ 1: %0.04f' %
-          (num_examples, true_count, precision))
-
-
-def flatten(features):
-    shape = features.shape
-    n_features = 1
-
-    for i in range(1, len(shape)):
-        n_features *= shape[i]
-
-    return np.reshape(features, (-1, n_features))
-
-
-# def one_hot(labels):
-#     input_length = len(labels)
-#
-#     one_hot_encoded = np.zeros((input_length, trafficsigns.NUM_CLASSES))
-#     one_hot_encoded[np.arange(input_length), labels] = 1
-#     return one_hot_encoded
+    # Display the training images in the visualizer.
+    tf.image_summary('images', images)
+    return images, tf.reshape(label_batch, [batch_size])
 
 
 def read_data_sets(input_data_dir):
@@ -171,9 +118,66 @@ def read_data_sets(input_data_dir):
     with open(testing_file, mode='rb') as f:
         test = pickle.load(f)
 
-    return Datasets(Dataset(flatten(train['features']), train['labels']),
-                    Dataset(flatten(train['features']), train['labels']),
-                    Dataset(flatten(test['features']), test['labels']))
+    return Datasets(Dataset(train['features'], train['labels']),
+                    Dataset(train['features'], train['labels']),
+                    Dataset(test['features'], test['labels']))
+
+
+def distorted_inputs(data_set):
+    """Construct distorted input for traffic signal training using the pickled datasets
+
+    Args:
+        data_set: Pickled dataset for traffic signs
+
+    Returns:
+        images: Images. 4D tensor of [batch_size, IMAGE_SIZE, IMAGE_SIZE, 3] size.
+        labels: Labels. 1D tensor of [batch_size] size.
+    """
+    image_feed, label_feed = data_set.next_example()
+
+    # Apply distortions
+    reshaped_image = tf.cast(image_feed, tf.float32)
+    reshaped_label = tf.cast(label_feed, tf.int32)
+
+    height = IMAGE_SIZE
+    width = IMAGE_SIZE
+
+    # Image processing for training the network. Note the many random
+    # distortions applied to the image.
+
+    # Randomly crop a [height, width] section of the image.
+    distorted_image = tf.random_crop(reshaped_image, [height, width, 3])
+
+    # Randomly flip the image horizontally.
+    distorted_image = tf.image.random_flip_left_right(distorted_image)
+
+    # Because these operations are not commutative, consider randomizing
+    # the order their operation.
+    distorted_image = tf.image.random_brightness(distorted_image,
+                                                 max_delta=63)
+    distorted_image = tf.image.random_contrast(distorted_image,
+                                               lower=0.2, upper=1.8)
+
+    # Subtract off the mean and divide by the variance of the pixels.
+    float_image = tf.image.per_image_standardization(distorted_image)
+
+    # Set the shapes of tensors.
+    float_image.set_shape([height, width, 3])
+
+    print(reshaped_label)
+    reshaped_label.set_shape([1])
+
+    # Ensure that the random shuffling has good mixing properties.
+    min_fraction_of_examples_in_queue = 0.4
+    min_queue_examples = int(data_set.num_examples *
+                             min_fraction_of_examples_in_queue)
+    print('Filling queue with %d traffic sign images before starting to train. '
+          'This will take a few minutes.' % min_queue_examples)
+
+    # Generate a batch of images and labels by building up a queue of examples.
+    return _generate_image_and_label_batch(float_image, reshaped_label,
+                                                               min_queue_examples, FLAGS.batch_size,
+                                                               shuffle=True)
 
 
 def run_training():
@@ -184,156 +188,61 @@ def run_training():
 
     # Tell TensorFlow that the model will be built into the default Graph.
     with tf.Graph().as_default():
-        # Generate placeholders for the images and labels.
-        images_placeholder, labels_placeholder = placeholder_inputs()
+        global_step = tf.contrib.framework.get_or_create_global_step()
+
+        # Fill a feed with the distorted set of images and labels
+        # for this particular training step.
+        images, labels = distorted_inputs(data_sets.train)
 
         # Build a Graph that computes predictions from the inference model.
-        logits = trafficsigns.inference(images_placeholder,
-                                        FLAGS.hidden1,
-                                        FLAGS.hidden2)
+        logits = trafficsigns.inference(images)
 
         # Add to the Graph the Ops for loss calculation.
-        loss = trafficsigns.loss(logits, labels_placeholder)
+        loss = trafficsigns.loss(logits, labels)
 
         # Add to the Graph the Ops that calculate and apply gradients.
-        train_op = trafficsigns.training(loss, FLAGS.learning_rate)
+        train_op = trafficsigns.training(loss, global_step)
 
-        # Add the Op to compare the logits to the labels during evaluation.
-        eval_correct = trafficsigns.evaluation(logits, labels_placeholder)
+        class _LoggerHook(tf.train.SessionRunHook):
+            """Logs loss and runtime."""
 
-        # Build the summary Tensor based on the TF collection of Summaries.
-        summary = tf.summary.merge_all()
+            def begin(self):
+                self._step = -1
 
-        # Add the variable initializer Op.
-        init = tf.global_variables_initializer()
+            def before_run(self, run_context):
+                self._step += 1
+                self._start_time = time.time()
+                return tf.train.SessionRunArgs(loss)  # Asks for loss value.
 
-        # Create a saver for writing training checkpoints.
-        saver = tf.train.Saver()
+            def after_run(self, run_context, run_values):
+                duration = time.time() - self._start_time
+                loss_value = run_values.results
+                if self._step % 10 == 0:
+                    num_examples_per_step = FLAGS.batch_size
+                    examples_per_sec = num_examples_per_step / duration
+                    sec_per_batch = float(duration)
 
-        # Create a session for running Ops on the Graph.
-        sess = tf.Session()
+                    format_str = ('%s: step %d, loss = %.2f (%.1f examples/sec; %.3f '
+                                  'sec/batch)')
+                    print(format_str % (datetime.now(), self._step, loss_value,
+                                        examples_per_sec, sec_per_batch))
 
-        # Instantiate a SummaryWriter to output summaries and the Graph.
-        summary_writer = tf.summary.FileWriter(FLAGS.log_dir, sess.graph)
-
-        # And then after everything is built:
-
-        # Run the Op to initialize the variables.
-        sess.run(init)
-
-        # Start the training loop.
-        for step in range(FLAGS.max_steps):
-            start_time = time.time()
-
-            # Fill a feed dictionary with the actual set of images and labels
-            # for this particular training step.
-            feed_dict = fill_feed_dict(data_sets.train,
-                                       images_placeholder,
-                                       labels_placeholder)
-
-            # Run one step of the model.  The return values are the activations
-            # from the `train_op` (which is discarded) and the `loss` Op.  To
-            # inspect the values of your Ops or variables, you may include them
-            # in the list passed to sess.run() and the value tensors will be
-            # returned in the tuple from the call.
-            _, loss_value = sess.run([train_op, loss],
-                                     feed_dict=feed_dict)
-
-            duration = time.time() - start_time
-
-            # Write the summaries and print an overview fairly often.
-            if step % 100 == 0:
-                # Print status to stdout.
-                print('Step %d: loss = %.2f (%.3f sec)' % (step, loss_value, duration))
-                # Update the events file.
-                summary_str = sess.run(summary, feed_dict=feed_dict)
-                summary_writer.add_summary(summary_str, step)
-                summary_writer.flush()
-
-            # Save a checkpoint and evaluate the model periodically.
-            if (step + 1) % 1000 == 0 or (step + 1) == FLAGS.max_steps:
-                checkpoint_file = os.path.join(FLAGS.log_dir, 'model.ckpt')
-                saver.save(sess, checkpoint_file, global_step=step)
-                # Evaluate against the training set.
-                print('Training Data Eval:')
-                do_eval(sess,
-                        eval_correct,
-                        images_placeholder,
-                        labels_placeholder,
-                        data_sets.train)
-                # Evaluate against the validation set.
-                print('Validation Data Eval:')
-                do_eval(sess,
-                        eval_correct,
-                        images_placeholder,
-                        labels_placeholder,
-                        data_sets.validation)
-                # Evaluate against the test set.
-                print('Test Data Eval:')
-                do_eval(sess,
-                        eval_correct,
-                        images_placeholder,
-                        labels_placeholder,
-                        data_sets.test)
+        with tf.train.MonitoredTrainingSession(
+                checkpoint_dir=FLAGS.training_dir,
+                hooks=[tf.train.StopAtStepHook(last_step=FLAGS.max_steps),
+                       tf.train.NanTensorHook(loss),
+                       _LoggerHook()],
+                config=tf.ConfigProto(
+                    log_device_placement=FLAGS.log_device_placement)) as mon_sess:
+            while not mon_sess.should_stop():
+                mon_sess.run(train_op)
 
 
-def main(_):
-    if tf.gfile.Exists(FLAGS.log_dir):
-        tf.gfile.DeleteRecursively(FLAGS.log_dir)
-    tf.gfile.MakeDirs(FLAGS.log_dir)
+def main(argv=None):
+    if tf.gfile.Exists(FLAGS.training_dir):
+        tf.gfile.DeleteRecursively(FLAGS.training_dir)
+    tf.gfile.MakeDirs(FLAGS.training_dir)
     run_training()
 
-
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--learning_rate',
-        type=float,
-        default=0.01,
-        help='Initial learning rate.'
-    )
-    parser.add_argument(
-        '--max_steps',
-        type=int,
-        default=2000,
-        help='Number of steps to run trainer.'
-    )
-    parser.add_argument(
-        '--hidden1',
-        type=int,
-        default=128,
-        help='Number of units in hidden layer 1.'
-    )
-    parser.add_argument(
-        '--hidden2',
-        type=int,
-        default=32,
-        help='Number of units in hidden layer 2.'
-    )
-    parser.add_argument(
-        '--batch_size',
-        type=int,
-        default=100,
-        help='Batch size.  Must divide evenly into the dataset sizes.'
-    )
-    parser.add_argument(
-        '--input_data_dir',
-        type=str,
-        default='traffic-signs-data',
-        help='Directory to put the input data.'
-    )
-    parser.add_argument(
-        '--log_dir',
-        type=str,
-        default='/tmp/trafficsigns/logs/fully_connected_feed',
-        help='Directory to put the log data.'
-    )
-    parser.add_argument(
-        '--fake_data',
-        default=False,
-        help='If true, uses fake data for unit testing.',
-        action='store_true'
-    )
-
-    FLAGS, unparsed = parser.parse_known_args()
-    tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
+  tf.app.run()

@@ -34,8 +34,6 @@ import tensorflow as tf
 import re
 import trafficsigns_train
 
-FLAGS = tf.app.flags.FLAGS
-
 # Basic model parameters.
 BATCH_SIZE = 128
 DATA_DIR = 'traffic-signs-data'
@@ -174,7 +172,7 @@ def inference(images):
     # local3
     with tf.variable_scope('local3') as scope:
         # Move everything into depth so we can perform a single matrix multiply.
-        reshape = tf.reshape(pool2, [FLAGS.batch_size, -1])
+        reshape = tf.reshape(pool2, [BATCH_SIZE, -1])
         dim = reshape.get_shape()[1].value
         weights = _variable_with_weight_decay('weights', shape=[dim, 384],
                                               stddev=0.04, wd=0.004)
@@ -271,7 +269,7 @@ def training(total_loss, global_step):
     """
 
     # Variables that affect learning rate.
-    num_batches_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / FLAGS.batch_size
+    num_batches_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / BATCH_SIZE
     decay_steps = int(num_batches_per_epoch * NUM_EPOCHS_PER_DECAY)
 
     # Decay the learning rate exponentially based on the number of steps.

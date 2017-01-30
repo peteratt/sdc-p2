@@ -39,8 +39,8 @@ NUM_CLASSES = 43
 NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 50000
 NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 10000
 
-# Basic model parameters as external flags.
-FLAGS = tf.app.flags.FLAGS
+# Directory for input data
+INPUT_DATA_DIR = 'traffic-signs-data'
 
 # Directory where to write event logs and checkpoint.
 TRAINING_DIR = 'trafficsigns_train'
@@ -48,7 +48,7 @@ TRAINING_DIR = 'trafficsigns_train'
 # Number of batches to run.
 MAX_STEPS = 1000000
 
-log_device_placement = False
+LOG_DEVICE_PLACEMENT = False
 
 class Datasets:
     def __init__(self, train, validation, test):
@@ -176,7 +176,7 @@ def distorted_inputs(data_set):
 
     # Generate a batch of images and labels by building up a queue of examples.
     return _generate_image_and_label_batch(float_image, reshaped_label,
-                                                               min_queue_examples, FLAGS.batch_size,
+                                                               min_queue_examples, trafficsigns.BATCH_SIZE,
                                                                shuffle=True)
 
 
@@ -184,7 +184,7 @@ def run_training():
     """Train traffic signs for a number of steps."""
     # Get the sets of images and labels for training, validation, and
     # test on traffic signs.
-    data_sets = read_data_sets(FLAGS.input_data_dir)
+    data_sets = read_data_sets(INPUT_DATA_DIR)
 
     # Tell TensorFlow that the model will be built into the default Graph.
     with tf.Graph().as_default():
@@ -218,7 +218,7 @@ def run_training():
                 duration = time.time() - self._start_time
                 loss_value = run_values.results
                 if self._step % 10 == 0:
-                    num_examples_per_step = FLAGS.batch_size
+                    num_examples_per_step = trafficsigns.BATCH_SIZE
                     examples_per_sec = num_examples_per_step / duration
                     sec_per_batch = float(duration)
 
@@ -228,20 +228,20 @@ def run_training():
                                         examples_per_sec, sec_per_batch))
 
         with tf.train.MonitoredTrainingSession(
-                checkpoint_dir=FLAGS.training_dir,
-                hooks=[tf.train.StopAtStepHook(last_step=FLAGS.max_steps),
+                checkpoint_dir=TRAINING_DIR,
+                hooks=[tf.train.StopAtStepHook(last_step=MAX_STEPS),
                        tf.train.NanTensorHook(loss),
                        _LoggerHook()],
                 config=tf.ConfigProto(
-                    log_device_placement=FLAGS.log_device_placement)) as mon_sess:
+                    log_device_placement=LOG_DEVICE_PLACEMENT)) as mon_sess:
             while not mon_sess.should_stop():
                 mon_sess.run(train_op)
 
 
 def main(argv=None):
-    if tf.gfile.Exists(FLAGS.training_dir):
-        tf.gfile.DeleteRecursively(FLAGS.training_dir)
-    tf.gfile.MakeDirs(FLAGS.training_dir)
+    if tf.gfile.Exists(TRAINING_DIR):
+        tf.gfile.DeleteRecursively(TRAINING_DIR)
+    tf.gfile.MakeDirs(TRAINING_DIR)
     run_training()
 
 if __name__ == '__main__':

@@ -1,3 +1,4 @@
 .idea/
 __pycache__/
 traffic-signs-data/
+trafficsigns_train/

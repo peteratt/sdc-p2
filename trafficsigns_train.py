@@ -1,19 +1,10 @@
-# Copyright 2015 The TensorFlow Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
+"""A binary to train traffic signs using a single GPU.
 
-"""Trains and Evaluates the MNIST network using a feed dictionary."""
+Accuracy:
+trafficsigns_train.py achieves ~86% accuracy after 100K steps (256 epochs of
+data) as judged by trafficsigns_eval.py.
+
+"""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -224,7 +215,7 @@ def run_training():
 
                     format_str = ('%s: step %d, loss = %.2f (%.1f examples/sec; %.3f '
                                   'sec/batch)')
-                    print(format_str % (datetime.now(), self._step, loss_value,
+                    print(format_str % (datetime.datetime.now(), self._step, loss_value,
                                         examples_per_sec, sec_per_batch))
 
         with tf.train.MonitoredTrainingSession(

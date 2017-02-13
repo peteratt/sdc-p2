@@ -21,16 +21,23 @@ from __future__ import print_function
 
 import tensorflow as tf
 import re
+
 import trafficsigns_train
+import trafficsigns_eval
+
+# Process images of this size. Note that this differs from the original traffic signs
+# image size of 32 x 32. If one alters this number, then the entire model
+# architecture will change and any model would need to be retrained.
+IMAGE_SIZE = 24
 
 # Basic model parameters.
 BATCH_SIZE = 128
 DATA_DIR = 'traffic-signs-data'
 
 # Global constants describing the traffic signs data set.
-IMAGE_SIZE = trafficsigns_train.IMAGE_SIZE
-NUM_CLASSES = trafficsigns_train.NUM_CLASSES
+NUM_CLASSES = 43
 NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = trafficsigns_train.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
+NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = trafficsigns_eval.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
 
 # Constants describing the training process.
 MOVING_AVERAGE_DECAY = 0.9999     # The decay to use for the moving average.

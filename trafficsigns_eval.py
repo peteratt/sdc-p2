@@ -42,6 +42,12 @@ import numpy as np
 import tensorflow as tf
 
 import trafficsigns
+import trafficsigns_input
+
+# Global constants describing the traffic signs data set.
+NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 10000
+
+EVAL_DIR = 'trafficsigns_eval'
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -114,12 +120,84 @@ def eval_once(saver, summary_writer, top_k_op, summary_op):
         coord.join(threads, stop_grace_period_secs=10)
 
 
+def _generate_image_and_label_batch(image, label, min_queue_examples, batch_size):
+    """Construct a queued batch of images and labels.
+
+      Args:
+        image: 3-D Tensor of [height, width, 3] of type.float32.
+        label: 1-D Tensor of type.int32
+        min_queue_examples: int32, minimum number of samples to retain
+          in the queue that provides of batches of examples.
+        batch_size: Number of images per batch.
+
+      Returns:
+        images: Images. 4D tensor of [batch_size, height, width, 3] size.
+        labels: Labels. 1D tensor of [batch_size] size.
+      """
+    # Create a queue that shuffles the examples, and then
+    # read 'batch_size' images + labels from the example queue.
+    num_preprocess_threads = 16
+    images, label_batch = tf.train.batch(
+        [image, label],
+        batch_size=batch_size,
+        num_threads=num_preprocess_threads,
+        capacity=min_queue_examples + 3 * batch_size)
+
+    # Display the training images in the visualizer.
+    tf.image_summary('images', images)
+    return images, tf.reshape(label_batch, [batch_size])
+
+
+def inputs(data_set):
+    """Construct input for traffic signal evaluation using the pickled datasets
+
+    Args:
+        data_set: Pickled dataset for traffic signs
+
+    Returns:
+        images: Images. 4D tensor of [batch_size, IMAGE_SIZE, IMAGE_SIZE, 3] size.
+        labels: Labels. 1D tensor of [batch_size] size.
+    """
+    image_feed, label_feed = data_set.next_example()
+
+    # Apply distortions
+    reshaped_image = tf.cast(image_feed, tf.float32)
+    reshaped_label = tf.cast(label_feed, tf.int32)
+
+    height = trafficsigns.IMAGE_SIZE
+    width = trafficsigns.IMAGE_SIZE
+
+    # Image processing for evaluation.
+    # Crop the central [height, width] of the image.
+    resized_image = tf.image.resize_image_with_crop_or_pad(reshaped_image,
+                                                           width, height)
+
+    # Subtract off the mean and divide by the variance of the pixels.
+    float_image = tf.image.per_image_standardization(resized_image)
+
+    # Set the shapes of tensors.
+    float_image.set_shape([height, width, 3])
+    reshaped_label.set_shape([1])
+
+    # Ensure that the random shuffling has good mixing properties.
+    min_fraction_of_examples_in_queue = 0.4
+    min_queue_examples = int(data_set.num_examples *
+                             min_fraction_of_examples_in_queue)
+    print('Filling queue with %d traffic sign images before starting to evaluate. '
+          'This will take a few minutes.' % min_queue_examples)
+
+    # Generate a batch of images and labels by building up a queue of examples.
+    return _generate_image_and_label_batch(float_image, reshaped_label,
+                                           min_queue_examples, trafficsigns.BATCH_SIZE)
+
+
 def evaluate():
-    """Eval CIFAR-10 for a number of steps."""
+    """Eval traffic signs for a number of steps."""
+    eval_data = trafficsigns_input.read_eval_data()
+
     with tf.Graph().as_default() as g:
-        # Get images and labels for CIFAR-10.
-        eval_data = FLAGS.eval_data == 'test'
-        images, labels = trafficsigns.inputs(eval_data=eval_data)
+        # Get evaluation images and labels for traffic signs
+        images, labels = inputs(eval_data)
 
         # Build a Graph that computes the logits predictions from the
         # inference model.
@@ -147,10 +225,9 @@ def evaluate():
 
 
 def main(argv=None):  # pylint: disable=unused-argument
-    trafficsigns.maybe_download_and_extract()
-    if tf.gfile.Exists(FLAGS.eval_dir):
-        tf.gfile.DeleteRecursively(FLAGS.eval_dir)
-    tf.gfile.MakeDirs(FLAGS.eval_dir)
+    if tf.gfile.Exists(EVAL_DIR):
+        tf.gfile.DeleteRecursively(EVAL_DIR)
+    tf.gfile.MakeDirs(EVAL_DIR)
     evaluate()
 
 

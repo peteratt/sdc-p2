@@ -29,6 +29,7 @@ def read_train_data():
     with open(training_file, mode='rb') as f:
         train = pickle.load(f)
 
+    print('returning', len(train['features']), 'train traffic images')
     return Dataset(train['features'], train['labels'])
 
 
@@ -38,6 +39,7 @@ def read_eval_data():
     with open(eval_file, mode='rb') as f:
         eval = pickle.load(f)
 
+    print('returning', len(eval['features']), 'eval traffic images')
     return Dataset(eval['features'], eval['labels'])
 
 
@@ -47,4 +49,5 @@ def read_test_data():
     with open(testing_file, mode='rb') as f:
         test = pickle.load(f)
 
+    print('returning', len(test['features']), 'test traffic images')
     return Dataset(test['features'], test['labels'])

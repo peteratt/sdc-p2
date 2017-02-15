@@ -43,7 +43,8 @@ import tensorflow as tf
 import trafficsigns
 import trafficsigns_input
 
-NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 10000
+NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 4410
+NUM_EXAMPLES_PER_EPOCH_FOR_TEST = 12630
 
 EVAL_DIR = 'trafficsigns_eval'
 TEST_DIR = 'trafficsigns_test'
@@ -58,7 +59,7 @@ CHECKPOINT_DIR = 'trafficsigns_train'
 MODE_EVAL = 0
 MODE_TEST = 1
 
-mode = MODE_EVAL
+mode = MODE_TEST
 
 
 def eval_once(saver, summary_writer, top_k_op, summary_op):
@@ -218,10 +219,7 @@ def evaluate():
         summary_op = tf.summary.merge_all()
 
         summary_writer = tf.summary.FileWriter(EVAL_DIR, g)
-
-        while True:
-            eval_once(saver, summary_writer, top_k_op, summary_op)
-
+        eval_once(saver, summary_writer, top_k_op, summary_op)
 
 
 def main(argv=None):  # pylint: disable=unused-argument

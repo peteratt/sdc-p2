@@ -16,7 +16,7 @@ import tensorflow as tf
 import trafficsigns
 import trafficsigns_input
 
-NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 50000
+NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 34799
 
 # Directory for input data
 INPUT_DATA_DIR = 'traffic-signs-data'
@@ -128,7 +128,6 @@ def run_training():
         # Fill a feed with the distorted set of images and labels
         # for this particular training step.
         images, labels = distorted_inputs(train_data)
-        num_examples = int(images.get_shape()[0])
 
         # Build a Graph that computes predictions from the inference model.
         logits = trafficsigns.inference(images)
@@ -179,9 +178,9 @@ def run_training():
 
 
 def main(argv=None):
-    if tf.gfile.Exists(TRAINING_DIR):
-        tf.gfile.DeleteRecursively(TRAINING_DIR)
-    tf.gfile.MakeDirs(TRAINING_DIR)
+    # if tf.gfile.Exists(TRAINING_DIR):
+    #     tf.gfile.DeleteRecursively(TRAINING_DIR)
+    # tf.gfile.MakeDirs(TRAINING_DIR)
     run_training()
 
 

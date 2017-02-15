@@ -22,9 +22,6 @@ from __future__ import print_function
 import tensorflow as tf
 import re
 
-import trafficsigns_train
-import trafficsigns_eval
-
 # Process images of this size. Note that this differs from the original traffic signs
 # image size of 32 x 32. If one alters this number, then the entire model
 # architecture will change and any model would need to be retrained.
@@ -36,8 +33,6 @@ DATA_DIR = 'traffic-signs-data'
 
 # Global constants describing the traffic signs data set.
 NUM_CLASSES = 43
-NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = trafficsigns_train.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
-NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = trafficsigns_eval.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
 
 # Constants describing the training process.
 MOVING_AVERAGE_DECAY = 0.9999     # The decay to use for the moving average.
@@ -250,7 +245,7 @@ def _add_loss_summaries(total_loss):
     return loss_averages_op
 
 
-def training(total_loss, global_step):
+def training(total_loss, global_step, num_examples):
     """Train traffic sign model.
 
     Create an optimizer and apply to all trainable variables. Add moving
@@ -260,12 +255,13 @@ def training(total_loss, global_step):
         total_loss: Total loss from loss().
         global_step: Integer Variable counting the number of training steps
             processed.
+        num_examples: total number of examples to train
     Returns:
         train_op: op for training.
     """
 
     # Variables that affect learning rate.
-    num_batches_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / BATCH_SIZE
+    num_batches_per_epoch = num_examples / BATCH_SIZE
     decay_steps = int(num_batches_per_epoch * NUM_EPOCHS_PER_DECAY)
 
     # Decay the learning rate exponentially based on the number of steps.

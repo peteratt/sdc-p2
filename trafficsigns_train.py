@@ -16,10 +16,6 @@ import tensorflow as tf
 import trafficsigns
 import trafficsigns_input
 
-# Global constants describing the traffic signs data set.
-
-NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 50000
-
 # Directory for input data
 INPUT_DATA_DIR = 'traffic-signs-data'
 
@@ -114,7 +110,7 @@ def distorted_inputs(data_set):
 
     # Generate a batch of images and labels by building up a queue of examples.
     return _generate_image_and_label_batch(float_image, reshaped_label,
-                                                               min_queue_examples, trafficsigns.BATCH_SIZE)
+                                           min_queue_examples, trafficsigns.BATCH_SIZE)
 
 
 def run_training():
@@ -129,7 +125,8 @@ def run_training():
 
         # Fill a feed with the distorted set of images and labels
         # for this particular training step.
-        images, labels = distorted_inputs(train_data.train)
+        images, labels = distorted_inputs(train_data)
+        num_examples = len(images)
 
         # Build a Graph that computes predictions from the inference model.
         logits = trafficsigns.inference(images)
@@ -138,10 +135,14 @@ def run_training():
         loss = trafficsigns.loss(logits, labels)
 
         # Add to the Graph the Ops that calculate and apply gradients.
-        train_op = trafficsigns.training(loss, global_step)
+        train_op = trafficsigns.training(loss, global_step, num_examples)
 
         class _LoggerHook(tf.train.SessionRunHook):
             """Logs loss and runtime."""
+
+            def __init__(self):
+                self._step = 0
+                self._start_time = time.time()
 
             def begin(self):
                 self._step = -1
@@ -175,11 +176,12 @@ def run_training():
                 mon_sess.run(train_op)
 
 
-def main(argv=None):
+def main():
     if tf.gfile.Exists(TRAINING_DIR):
         tf.gfile.DeleteRecursively(TRAINING_DIR)
     tf.gfile.MakeDirs(TRAINING_DIR)
     run_training()
+
 
 if __name__ == '__main__':
     tf.app.run()

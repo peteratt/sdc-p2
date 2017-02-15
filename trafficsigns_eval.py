@@ -36,7 +36,6 @@ from __future__ import print_function
 
 from datetime import datetime
 import math
-import time
 
 import numpy as np
 import tensorflow as tf
@@ -44,28 +43,23 @@ import tensorflow as tf
 import trafficsigns
 import trafficsigns_input
 
-# Global constants describing the traffic signs data set.
-NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 10000
-
 EVAL_DIR = 'trafficsigns_eval'
+TEST_DIR = 'trafficsigns_test'
 
-FLAGS = tf.app.flags.FLAGS
+# Data sources
+EVAL_DATA = 'traffic-signs-data/valid.p'
+TEST_DATA = 'traffic-signs-data/test.p'
 
-tf.app.flags.DEFINE_string('eval_dir', '/tmp/cifar10_eval',
-                           """Directory where to write event logs.""")
-tf.app.flags.DEFINE_string('eval_data', 'test',
-                           """Either 'test' or 'train_eval'.""")
-tf.app.flags.DEFINE_string('checkpoint_dir', '/tmp/cifar10_train',
-                           """Directory where to read model checkpoints.""")
-tf.app.flags.DEFINE_integer('eval_interval_secs', 60 * 5,
-                            """How often to run the eval.""")
-tf.app.flags.DEFINE_integer('num_examples', 10000,
-                            """Number of examples to run.""")
-tf.app.flags.DEFINE_boolean('run_once', False,
-                            """Whether to run eval only once.""")
+# Directory where to read training checkpoints
+CHECKPOINT_DIR = 'trafficsigns_train'
+
+MODE_EVAL = 0
+MODE_TEST = 1
+
+mode = MODE_EVAL
 
 
-def eval_once(saver, summary_writer, top_k_op, summary_op):
+def eval_once(saver, summary_writer, top_k_op, summary_op, num_examples):
     """Run Eval once.
 
     Args:
@@ -73,9 +67,10 @@ def eval_once(saver, summary_writer, top_k_op, summary_op):
       summary_writer: Summary writer.
       top_k_op: Top K op.
       summary_op: Summary op.
+      num_examples: number of examples to evaluate
     """
     with tf.Session() as sess:
-        ckpt = tf.train.get_checkpoint_state(FLAGS.checkpoint_dir)
+        ckpt = tf.train.get_checkpoint_state(CHECKPOINT_DIR)
         if ckpt and ckpt.model_checkpoint_path:
             # Restores from checkpoint
             saver.restore(sess, ckpt.model_checkpoint_path)
@@ -96,9 +91,9 @@ def eval_once(saver, summary_writer, top_k_op, summary_op):
                 threads.extend(qr.create_threads(sess, coord=coord, daemon=True,
                                                  start=True))
 
-            num_iter = int(math.ceil(FLAGS.num_examples / FLAGS.batch_size))
+            num_iter = int(math.ceil(num_examples / trafficsigns.BATCH_SIZE))
             true_count = 0  # Counts the number of correct predictions.
-            total_sample_count = num_iter * FLAGS.batch_size
+            total_sample_count = num_iter * trafficsigns.BATCH_SIZE
             step = 0
             while step < num_iter and not coord.should_stop():
                 predictions = sess.run([top_k_op])
@@ -193,11 +188,19 @@ def inputs(data_set):
 
 def evaluate():
     """Eval traffic signs for a number of steps."""
-    eval_data = trafficsigns_input.read_eval_data()
-
     with tf.Graph().as_default() as g:
         # Get evaluation images and labels for traffic signs
-        images, labels = inputs(eval_data)
+
+        if mode == MODE_EVAL:
+            eval_data = trafficsigns_input.read_eval_data()
+            images, labels = inputs(eval_data)
+        elif mode == MODE_TEST:
+            test_data = trafficsigns_input.read_test_data()
+            images, labels = inputs(test_data)
+        else:
+            raise Exception
+
+        num_examples = len(images)
 
         # Build a Graph that computes the logits predictions from the
         # inference model.
@@ -215,16 +218,11 @@ def evaluate():
         # Build the summary operation based on the TF collection of Summaries.
         summary_op = tf.summary.merge_all()
 
-        summary_writer = tf.summary.FileWriter(FLAGS.eval_dir, g)
-
-        while True:
-            eval_once(saver, summary_writer, top_k_op, summary_op)
-            if FLAGS.run_once:
-                break
-            time.sleep(FLAGS.eval_interval_secs)
+        summary_writer = tf.summary.FileWriter(EVAL_DIR, g)
+        eval_once(saver, summary_writer, top_k_op, summary_op, num_examples)
 
 
-def main(argv=None):  # pylint: disable=unused-argument
+def main():  # pylint: disable=unused-argument
     if tf.gfile.Exists(EVAL_DIR):
         tf.gfile.DeleteRecursively(EVAL_DIR)
     tf.gfile.MakeDirs(EVAL_DIR)

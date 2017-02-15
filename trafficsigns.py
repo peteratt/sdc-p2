@@ -25,6 +25,8 @@ import re
 # Process images of this size. Note that this differs from the original traffic signs
 # image size of 32 x 32. If one alters this number, then the entire model
 # architecture will change and any model would need to be retrained.
+import trafficsigns_train
+
 IMAGE_SIZE = 24
 
 # Basic model parameters.
@@ -245,7 +247,7 @@ def _add_loss_summaries(total_loss):
     return loss_averages_op
 
 
-def training(total_loss, global_step, num_examples):
+def training(total_loss, global_step):
     """Train traffic sign model.
 
     Create an optimizer and apply to all trainable variables. Add moving
@@ -255,13 +257,12 @@ def training(total_loss, global_step, num_examples):
         total_loss: Total loss from loss().
         global_step: Integer Variable counting the number of training steps
             processed.
-        num_examples: total number of examples to train
     Returns:
         train_op: op for training.
     """
 
     # Variables that affect learning rate.
-    num_batches_per_epoch = num_examples / BATCH_SIZE
+    num_batches_per_epoch = trafficsigns_train.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / BATCH_SIZE
     decay_steps = int(num_batches_per_epoch * NUM_EPOCHS_PER_DECAY)
 
     # Decay the learning rate exponentially based on the number of steps.

@@ -16,6 +16,8 @@ import tensorflow as tf
 import trafficsigns
 import trafficsigns_input
 
+NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 50000
+
 # Directory for input data
 INPUT_DATA_DIR = 'traffic-signs-data'
 
@@ -135,7 +137,7 @@ def run_training():
         loss = trafficsigns.loss(logits, labels)
 
         # Add to the Graph the Ops that calculate and apply gradients.
-        train_op = trafficsigns.training(loss, global_step, num_examples)
+        train_op = trafficsigns.training(loss, global_step)
 
         class _LoggerHook(tf.train.SessionRunHook):
             """Logs loss and runtime."""

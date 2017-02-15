@@ -43,6 +43,8 @@ import tensorflow as tf
 import trafficsigns
 import trafficsigns_input
 
+NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 10000
+
 EVAL_DIR = 'trafficsigns_eval'
 TEST_DIR = 'trafficsigns_test'
 
@@ -59,7 +61,7 @@ MODE_TEST = 1
 mode = MODE_EVAL
 
 
-def eval_once(saver, summary_writer, top_k_op, summary_op, num_examples):
+def eval_once(saver, summary_writer, top_k_op, summary_op):
     """Run Eval once.
 
     Args:
@@ -67,7 +69,6 @@ def eval_once(saver, summary_writer, top_k_op, summary_op, num_examples):
       summary_writer: Summary writer.
       top_k_op: Top K op.
       summary_op: Summary op.
-      num_examples: number of examples to evaluate
     """
     with tf.Session() as sess:
         ckpt = tf.train.get_checkpoint_state(CHECKPOINT_DIR)
@@ -91,7 +92,7 @@ def eval_once(saver, summary_writer, top_k_op, summary_op, num_examples):
                 threads.extend(qr.create_threads(sess, coord=coord, daemon=True,
                                                  start=True))
 
-            num_iter = int(math.ceil(num_examples / trafficsigns.BATCH_SIZE))
+            num_iter = int(math.ceil(NUM_EXAMPLES_PER_EPOCH_FOR_EVAL / trafficsigns.BATCH_SIZE))
             true_count = 0  # Counts the number of correct predictions.
             total_sample_count = num_iter * trafficsigns.BATCH_SIZE
             step = 0
@@ -200,8 +201,6 @@ def evaluate():
         else:
             raise Exception
 
-        num_examples = int(images.get_shape()[0])
-
         # Build a Graph that computes the logits predictions from the
         # inference model.
         logits = trafficsigns.inference(images)
@@ -219,7 +218,10 @@ def evaluate():
         summary_op = tf.summary.merge_all()
 
         summary_writer = tf.summary.FileWriter(EVAL_DIR, g)
-        eval_once(saver, summary_writer, top_k_op, summary_op, num_examples)
+
+        while True:
+            eval_once(saver, summary_writer, top_k_op, summary_op)
+
 
 
 def main(argv=None):  # pylint: disable=unused-argument

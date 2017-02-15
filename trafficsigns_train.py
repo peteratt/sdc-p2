@@ -126,7 +126,7 @@ def run_training():
         # Fill a feed with the distorted set of images and labels
         # for this particular training step.
         images, labels = distorted_inputs(train_data)
-        num_examples = len(images)
+        num_examples = int(images.get_shape()[0])
 
         # Build a Graph that computes predictions from the inference model.
         logits = trafficsigns.inference(images)
@@ -176,7 +176,7 @@ def run_training():
                 mon_sess.run(train_op)
 
 
-def main():
+def main(argv=None):
     if tf.gfile.Exists(TRAINING_DIR):
         tf.gfile.DeleteRecursively(TRAINING_DIR)
     tf.gfile.MakeDirs(TRAINING_DIR)

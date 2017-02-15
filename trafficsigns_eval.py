@@ -200,7 +200,7 @@ def evaluate():
         else:
             raise Exception
 
-        num_examples = len(images)
+        num_examples = int(images.get_shape()[0])
 
         # Build a Graph that computes the logits predictions from the
         # inference model.
@@ -222,7 +222,7 @@ def evaluate():
         eval_once(saver, summary_writer, top_k_op, summary_op, num_examples)
 
 
-def main():  # pylint: disable=unused-argument
+def main(argv=None):  # pylint: disable=unused-argument
     if tf.gfile.Exists(EVAL_DIR):
         tf.gfile.DeleteRecursively(EVAL_DIR)
     tf.gfile.MakeDirs(EVAL_DIR)

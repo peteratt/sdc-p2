@@ -2,3 +2,4 @@
 __pycache__/
 traffic-signs-data/
 trafficsigns_train/
+.DS_Store

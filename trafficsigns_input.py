@@ -79,6 +79,23 @@ def read_test_data():
     return Dataset(test['features'], test['labels'])
 
 
+def _get_n_img_per_class(labels):
+    n_img_per_class = []
+    current_y = 0
+    current_count = 0
+
+    for y in labels:
+        if y == current_y:
+            current_count += 1
+        else:
+            current_y = y
+            n_img_per_class.append(current_count)
+            current_count = 1
+
+    n_img_per_class.append(current_count)
+    return n_img_per_class
+
+
 def _extract_validation_set(train_features, train_labels):
     total_images, rows, cols = train_features.shape
 
@@ -112,23 +129,6 @@ def _extract_validation_set(train_features, train_labels):
         'X_validate': X_validate,
         'y_validate': y_validate
     }
-
-
-def _get_n_img_per_class(labels):
-    n_img_per_class = []
-    current_y = 0
-    current_count = 0
-
-    for y in labels:
-        if y == current_y:
-            current_count += 1
-        else:
-            current_y = y
-            n_img_per_class.append(current_count)
-            current_count = 1
-
-    n_img_per_class.append(current_count)
-    return n_img_per_class
 
 
 def _prepare_eval_data():
